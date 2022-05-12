@@ -1,8 +1,10 @@
+require 'set'
+
 class CommandsController < ApplicationController
   protect_from_forgery with: :null_session
   
   $storage_string = {}
-  $storage_key = {}
+  $storage_set = {}
 
   def index
   end
@@ -27,7 +29,7 @@ class CommandsController < ApplicationController
         $storage_string[new_command[1]] = new_command[2]
         render json: {
           code: 0,
-          message: "Ok"
+          message: "OK"
         }
       end
     when "GET"
@@ -42,6 +44,86 @@ class CommandsController < ApplicationController
           code: 0,
           key: new_command[1],
           value: $storage_string[new_command[1]]
+        }
+      end
+    when "SADD"
+      if new_command.length <= 2
+        render json: {
+          code: 2,
+          message: "ERROR: wrong number of arguments for 'sadd' command"
+        }
+      else
+        if $storage_string.has_key?(new_command[1])
+          render json: {
+            'code' => 4,
+            'message' => "ERROR: Operation against a key holding the wrong kind of value"
+          }
+        else
+          new_quantity_value = 0
+          if $storage_set[new_command[1]]
+            new_quantity_value = (new_command[2..].to_set - $storage_set[new_command[1]]).length()
+            $storage_set[new_command[1]].add(new_command[2..].to_set)
+          else
+            new_quantity_value = (new_command[2..].to_set).length()
+            $storage_set[new_command[1]] = new_command[2..].to_set
+          end
+          render json: {
+            code: 0,
+            message: new_quantity_value
+          }
+        end
+      end
+    when "SREM"
+      if new_command.length <= 2
+        render json: {
+          code: 2,
+          message: "ERROR: wrong number of arguments for 'srem' command"
+        }
+      else
+        quantity_del_value = 0
+        if $storage_set[new_command[1]]
+          quantity_del_value = (new_command[2..].to_set & $storage_set[new_command[1]]).length()
+          $storage_set[new_command[1]] -= new_command[2..].to_set
+        end
+        render json: {
+          code: 0,
+          message: quantity_del_value
+        }
+      end
+    when "SMEMBERS"
+      # Yet write test cases for it
+      if new_command.length == 2
+        render json: {
+          code: 0,
+          value: $storage_set[new_command[1]]
+        }
+      else
+        render json: {
+          code: 2,
+          message: "ERROR: wrong number of arguments for 'smembers' command"
+        }
+      end
+    when "SINTER"
+      if new_command.length <= 1
+        render json: {
+          code: 2,
+          message: "ERROR: wrong number of arguments for 'sinter' command"
+        }
+      elsif new_command.length == 2
+        render json: {
+          code: 0,
+          value: $storage_set[new_command[1]]
+        }
+      else
+        #binding.irb
+        value = []
+        new_command[1..].each do |key|
+          value.push($storage_set[key])  
+        end
+        value = value.inject(:&)
+        render json: {
+          code: 0,
+          value: value
         }
       end
     else

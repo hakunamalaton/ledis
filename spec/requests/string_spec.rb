@@ -8,7 +8,7 @@ describe 'String command API', type: :request do
       expect(JSON.parse(response.body)).to eq (
         {
           'code' => 0,
-          'message' => 'Ok'
+          'message' => 'OK'
         }
       )
     end
@@ -20,7 +20,7 @@ describe 'String command API', type: :request do
       expect(JSON.parse(response.body)).to eq (
         {
           'code' => 0,
-          'message' => 'Ok'
+          'message' => 'OK'
         }
       )
     end
@@ -32,7 +32,7 @@ describe 'String command API', type: :request do
       expect(JSON.parse(response.body)).to eq (
         {
           'code' => 0,
-          'message' => 'Ok'
+          'message' => 'OK'
         }
       )
     end
