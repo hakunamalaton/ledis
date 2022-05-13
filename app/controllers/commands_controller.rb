@@ -110,17 +110,19 @@ class CommandsController < ApplicationController
           message: "ERROR: wrong number of arguments for 'sinter' command"
         }
       elsif new_command.length == 2
+        # binding.irb
         render json: {
           code: 0,
           value: $storage_set[new_command[1]]
         }
       else
-        #binding.irb
+        # binding.irb
         value = []
-        new_command[1..].each do |key|
+        new_command[1..].each do |key| 
           value.push($storage_set[key])  
         end
         value = value.inject(:&)
+        # binding.irb
         render json: {
           code: 0,
           value: value

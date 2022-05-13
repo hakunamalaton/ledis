@@ -144,7 +144,52 @@ describe 'Set command API', type: :request do
 
   describe 'SMEMBERS' do
     describe 'SMEMBERS on valid key' do
-      
+      it 'access to exist key set' do 
+        post '/commands', params: { command: "SADD tlt 123 456" }
+        post '/commands', params: { command: "SMEMBERS tlt" }
+
+        expect(JSON.parse(response.body)).to eq (
+          {
+            'code' => 0,
+            'value' => ['123', '456']
+          }
+        )
+      end
+
+      it 'access to unexist key set' do
+        post '/commands', params: { command: "SMEMBERS yut" }
+
+        expect(JSON.parse(response.body)).to eq (
+          {
+            'code' => 0,
+            'value' => nil
+          }
+        )
+      end
+    end
+
+    describe 'SMEMBERS on invalid key' do
+      it 'arguments passing is 2' do 
+        post '/commands', params: { command: "SMEMBERS tlt ttl" }
+
+        expect(JSON.parse(response.body)).to eq (
+          {
+            'code' => 2,
+            'message' => "ERROR: wrong number of arguments for 'smembers' command"
+          }
+        )
+      end
+
+      it 'no key set is given' do
+        post '/commands', params: { command: "SMEMBERS" }
+
+        expect(JSON.parse(response.body)).to eq (
+          {
+            'code' => 2,
+            'message' => "ERROR: wrong number of arguments for 'smembers' command"
+          }
+        )
+      end
     end
   end
 
@@ -153,6 +198,8 @@ describe 'Set command API', type: :request do
       it '2 set key inter' do
         post '/commands', params: { command: "SADD ltt 1 2 3 a b c" }
         post '/commands', params: { command: "SADD ttl 1 4 7 c d e" }
+        post '/commands', params: { command: "SADD ttt c" }
+        post '/commands', params: { command: "SADD tlt something has no same" }
         post '/commands', params: { command: "SINTER ltt ttl" }
 
         expect(JSON.parse(response.body)).to eq (
@@ -162,6 +209,51 @@ describe 'Set command API', type: :request do
           }
         )
       end
+
+      it '3 set key inter, result is not empty' do
+        post '/commands', params: { command: "SINTER ltt ttl ttt" }
+
+        expect(JSON.parse(response.body)).to eq (
+          {
+            'code' => 0,
+            'value' => ['c']
+          }
+        )
+      end
+
+      it '3 set key inter, result is empty' do
+        post '/commands', params: { command: "SINTER ltt ttl tlt" }
+
+        expect(JSON.parse(response.body)).to eq (
+          {
+            'code' => 0,
+            'value' => []
+          }
+        )
+      end
+
+      it '1 set key inter' do
+        post '/commands', params: { command: "SINTER ltt" }
+
+        expect(JSON.parse(response.body)).to eq (
+          {
+            'code' => 0,
+            'value' => ['1','2','3','a','b','c']
+          }
+        )
+      end
+
+      it '1 set key inter but not exist' do
+        post '/commands', params: { command: "SINTER mmm" }
+
+        expect(JSON.parse(response.body)).to eq (
+          {
+            'code' => 0,
+            'value' => nil
+          }
+        )
+      end
     end
+
   end
 end
