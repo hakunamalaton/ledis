@@ -11,9 +11,9 @@ class CommandsController < ApplicationController
   end
 
   def create
-    new_command = commands_params.split(" ")
-
+    new_command = commands_params.squeeze(" ").split(" ")
     #  check error before logical code
+    
     case new_command[0].upcase
     when "SET" 
       if new_command.length < 3 
@@ -45,10 +45,11 @@ class CommandsController < ApplicationController
       else
         key = new_command[1]
         if ($expire_key[key] == nil) or ($expire_key[key] and key_expiration_time($expire_key[key]))
+          puts $storage_string[key]
           render json: {
             code: 0,
             key: key,
-            value: $storage_string[new_command[1]]
+            value: $storage_string[key]
           }
         else
           $storage_string.delete(key) if $storage_string.has_key?(key)
@@ -104,6 +105,7 @@ class CommandsController < ApplicationController
         if $storage_set[key] and check_key_valid?(key,'set')
           quantity_del_value = (new_command[2..].to_set & $storage_set[key]).length()
           $storage_set[key] -= new_command[2..].to_set
+          $storage_set.delete(key) if $storage_set[key].empty?
         end
         render json: {
           code: 0,
@@ -117,7 +119,7 @@ class CommandsController < ApplicationController
         if ($expire_key[key] == nil) or (($expire_key[key] != -2) and key_expiration_time($expire_key[key]))
           render json: {
             code: 0,
-            value: $storage_set[key]
+            value: $storage_set[key] ? $storage_set[key] : []
           }
         else
           $storage_set.delete(key) if $storage_set.has_key?(key)
@@ -239,7 +241,7 @@ class CommandsController < ApplicationController
         if $storage_string.has_key?(key) or $storage_set.has_key?(key)
           # that key is exist and has default ttl
           
-          if second <=0 
+          if second <= 0 
             $expire_key[key] = -2
             $storage_string.delete(key) if $storage_string.has_key?(key)
             $storage_set.delete(key) if $storage_set.has_key?(key)
