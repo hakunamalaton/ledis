@@ -5,7 +5,7 @@ class CommandsController < ApplicationController
   
   $storage_string = {}
   $storage_set = {}
-  
+  $expire_key = {}
 
   def index
   end
@@ -57,8 +57,8 @@ class CommandsController < ApplicationController
       else
         if $storage_string.has_key?(new_command[1])
           render json: {
-            'code' => 4,
-            'message' => "ERROR: Operation against a key holding the wrong kind of value"
+            code: 4,
+            message: "ERROR: Operation against a key holding the wrong kind of value"
           }
         else
           new_quantity_value = 0
@@ -165,6 +165,99 @@ class CommandsController < ApplicationController
           message: quantity_deleted
         }
       end
+    when "EXPIRE"
+      if new_command.length > 3 or new_command.length <= 2
+        render json: {
+          code: 2,
+          message: error_code_2('expire')
+        }
+      else
+        key = new_command[1]
+        second = new_command[2]
+        side = 1
+        if second[0] == '-'
+          side = -1
+          second = second[1..]
+        end
+        
+        if second.match?(/[^0-9]/)
+          render json: {
+            code: 5,
+            message: "ERROR: value is not an integer or out of range"
+          }
+          return
+        else
+          second = second.to_i * side
+        end
+
+        if $storage_string.has_key?(key) or $storage_set.has_key?(key)
+          # that key is exist and has default ttl
+          
+
+          if second <=0 
+            $expire_key[key] = -2
+            $storage_string.delete(key) if $storage_string.has_key?(key)
+            $storage_set.delete(key) if $storage_set.has_key?(key)
+          else
+            # binding.irb
+            if ($expire_key[key] == nil) or ($expire_key[key] != -2 and Time.now - $expire_key[key] <= 0) 
+              $expire_key[key] = Time.now + second
+            else
+              render json: {
+                code: 0,
+                value: 0
+              }
+              return
+            end
+          end
+          render json: {
+            code: 0,
+            value: 1
+          }
+        else
+          render json: {
+            code: 0,
+            value: 0
+          }
+        end
+      end
+    when "TTL"
+      if new_command.length != 2
+        render json: {
+          code: 2,
+          message: error_code_2('ttl')
+        }
+      else
+        key = new_command[1]
+        if !$storage_set.has_key?(key) and !$storage_string.has_key?(key) 
+          render json: {
+            code: 0,
+            value: -2
+          }
+        elsif $expire_key[key]
+          time_remain = ($expire_key[key] - Time.now)
+          if key_expiration_time($expire_key[key])
+            render json: {
+              code: 0,
+              value: time_remain.to_i
+            }
+          else
+            $expire_key[key] = -2
+            $storage_string.delete(key) if $storage_string.has_key?(key)
+            $storage_set.delete(key) if $storage_set.has_key?(key)
+            render json: {
+              code: 0,
+              value: -2
+            }
+          end
+        else
+          render json: {
+            code: 0,
+            value: -1
+          }
+        end
+        
+      end
     else
       render json: {
         code: 1,
@@ -181,5 +274,9 @@ class CommandsController < ApplicationController
 
   def error_code_2(command)
     "ERROR: wrong number of arguments for '#{command}' command"
+  end
+
+  def key_expiration_time(time_to_be_expired)
+    (time_to_be_expired - Time.now) > 0
   end
 end
