@@ -5,6 +5,7 @@ class CommandsController < ApplicationController
   
   $storage_string = {}
   $storage_set = {}
+  
 
   def index
   end
@@ -18,7 +19,7 @@ class CommandsController < ApplicationController
       if new_command.length < 3 
         render json: {
           code: 2,
-          message: "ERROR: wrong number of arguments for 'set' command"
+          message: error_code_2('set')
         }
       elsif new_command.length > 3
         render json: {
@@ -27,6 +28,7 @@ class CommandsController < ApplicationController
         }
       else
         $storage_string[new_command[1]] = new_command[2]
+        $storage_set.delete(new_command[1]) if $storage_set.has_key?(new_command[1])
         render json: {
           code: 0,
           message: "OK"
@@ -37,7 +39,7 @@ class CommandsController < ApplicationController
       if new_command.length != 2 
         render json: {
           code: 2,
-          message: "ERROR: wrong number of arguments for 'get' command"
+          message: error_code_2('get')
         }
       else
         render json: {
@@ -50,7 +52,7 @@ class CommandsController < ApplicationController
       if new_command.length <= 2
         render json: {
           code: 2,
-          message: "ERROR: wrong number of arguments for 'sadd' command"
+          message: error_code_2('sadd')
         }
       else
         if $storage_string.has_key?(new_command[1])
@@ -77,7 +79,7 @@ class CommandsController < ApplicationController
       if new_command.length <= 2
         render json: {
           code: 2,
-          message: "ERROR: wrong number of arguments for 'srem' command"
+          message: error_code_2('srem')
         }
       else
         quantity_del_value = 0
@@ -100,14 +102,14 @@ class CommandsController < ApplicationController
       else
         render json: {
           code: 2,
-          message: "ERROR: wrong number of arguments for 'smembers' command"
+          message: error_code_2('smembers')
         }
       end
     when "SINTER"
       if new_command.length <= 1
         render json: {
           code: 2,
-          message: "ERROR: wrong number of arguments for 'sinter' command"
+          message: error_code_2('sinter')
         }
       elsif new_command.length == 2
         # binding.irb
@@ -128,6 +130,41 @@ class CommandsController < ApplicationController
           value: value
         }
       end
+    when "KEYS"
+      if new_command.length >= 2
+        render json: {
+          code: 2,
+          message: error_code_2('keys')
+        }
+      else
+        all_keys = []
+        all_keys += $storage_string.keys 
+        all_keys += $storage_set.keys 
+        render json: {
+          code: 0,
+          keys: all_keys
+        }
+      end
+    when "DEL"
+      if new_command.length <=1 or new_command.length >= 3
+        render json: {
+          code: 2,
+          message: error_code_2('del')
+        }
+      else
+        quantity_deleted = 0
+        if $storage_string.has_key?(new_command[1])
+          $storage_string.delete(new_command[1])
+          quantity_deleted = 1
+        elsif $storage_set.has_key?(new_command[1])
+          $storage_set.delete(new_command[1])
+          quantity_deleted = 1
+        end
+        render json: {
+          code: 0,
+          message: quantity_deleted
+        }
+      end
     else
       render json: {
         code: 1,
@@ -140,5 +177,9 @@ class CommandsController < ApplicationController
   private 
   def commands_params
     params.require(:command)
+  end
+
+  def error_code_2(command)
+    "ERROR: wrong number of arguments for '#{command}' command"
   end
 end
