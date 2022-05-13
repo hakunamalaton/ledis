@@ -29,6 +29,7 @@ class CommandsController < ApplicationController
       else
         $storage_string[new_command[1]] = new_command[2]
         $storage_set.delete(new_command[1]) if $storage_set.has_key?(new_command[1])
+        $expire_key.delete(new_command[1]) if $expire_key.has_key?(new_command[1])
         render json: {
           code: 0,
           message: "OK"
@@ -42,11 +43,21 @@ class CommandsController < ApplicationController
           message: error_code_2('get')
         }
       else
-        render json: {
-          code: 0,
-          key: new_command[1],
-          value: $storage_string[new_command[1]]
-        }
+        key = new_command[1]
+        if ($expire_key[key] == nil) or ($expire_key[key] and key_expiration_time($expire_key[key]))
+          render json: {
+            code: 0,
+            key: key,
+            value: $storage_string[new_command[1]]
+          }
+        else
+          $storage_string.delete(key) if $storage_string.has_key?(key)
+          render json: {
+            code: 0,
+            key: key,
+            value: nil
+          }
+        end
       end
     when "SADD"
       if new_command.length <= 2
@@ -56,24 +67,30 @@ class CommandsController < ApplicationController
         }
       else
         if $storage_string.has_key?(new_command[1])
-          render json: {
-            code: 4,
-            message: "ERROR: Operation against a key holding the wrong kind of value"
-          }
-        else
+          if check_key_valid?(new_command[1],'string')
+            render json: {
+              code: 4,
+              message: "ERROR: Operation against a key holding the wrong kind of value"
+            }
+          end
+        end
+        if !$storage_string.has_key?(new_command[1]) or ($storage_string.has_key?(new_command[1]) and !check_key_valid?(new_command[1],'string'))
+          key = new_command[1]
+          $expire_key.delete(key) if $expire_key.has_key?(key)
           new_quantity_value = 0
-          if $storage_set[new_command[1]]
-            new_quantity_value = (new_command[2..].to_set - $storage_set[new_command[1]]).length()
-            $storage_set[new_command[1]].add(new_command[2..].to_set)
+          if $storage_set[key]
+            new_quantity_value = (new_command[2..].to_set - $storage_set[key]).length()
+            $storage_set[key].add(new_command[2..].to_set)
           else
             new_quantity_value = (new_command[2..].to_set).length()
-            $storage_set[new_command[1]] = new_command[2..].to_set
+            $storage_set[key] = new_command[2..].to_set
           end
           render json: {
             code: 0,
             message: new_quantity_value
           }
         end
+        # binding.irb
       end
     when "SREM"
       if new_command.length <= 2
@@ -83,9 +100,10 @@ class CommandsController < ApplicationController
         }
       else
         quantity_del_value = 0
-        if $storage_set[new_command[1]]
-          quantity_del_value = (new_command[2..].to_set & $storage_set[new_command[1]]).length()
-          $storage_set[new_command[1]] -= new_command[2..].to_set
+        key = new_command[1]
+        if $storage_set[key] and check_key_valid?(key,'set')
+          quantity_del_value = (new_command[2..].to_set & $storage_set[key]).length()
+          $storage_set[key] -= new_command[2..].to_set
         end
         render json: {
           code: 0,
@@ -93,12 +111,21 @@ class CommandsController < ApplicationController
         }
       end
     when "SMEMBERS"
-      # Yet write test cases for it
       if new_command.length == 2
-        render json: {
-          code: 0,
-          value: $storage_set[new_command[1]]
-        }
+        key = new_command[1]
+        # binding.irb
+        if ($expire_key[key] == nil) or (($expire_key[key] != -2) and key_expiration_time($expire_key[key]))
+          render json: {
+            code: 0,
+            value: $storage_set[key]
+          }
+        else
+          $storage_set.delete(key) if $storage_set.has_key?(key)
+          render json: {
+            code: 0,
+            value: []
+          }
+        end
       else
         render json: {
           code: 2,
@@ -120,8 +147,17 @@ class CommandsController < ApplicationController
       else
         # binding.irb
         value = []
+
         new_command[1..].each do |key| 
-          value.push($storage_set[key])  
+          check_key_valid?(key,'set')
+        end
+
+        new_command[1..].each do |key| 
+          if $storage_set[key]
+            value.push($storage_set[key])
+          else
+            value.push([])
+          end
         end
         value = value.inject(:&)
         # binding.irb
@@ -138,6 +174,12 @@ class CommandsController < ApplicationController
         }
       else
         all_keys = []
+        $storage_string.keys.each do |key|
+          check_key_valid?(key,'string')
+        end
+        $storage_set.keys.each do |key|
+          check_key_valid?(key,'set')
+        end
         all_keys += $storage_string.keys 
         all_keys += $storage_set.keys 
         render json: {
@@ -154,11 +196,15 @@ class CommandsController < ApplicationController
       else
         quantity_deleted = 0
         if $storage_string.has_key?(new_command[1])
-          $storage_string.delete(new_command[1])
-          quantity_deleted = 1
+          if check_key_valid?(new_command[1],'string')
+            $storage_string.delete(new_command[1])
+            quantity_deleted = 1
+          end
         elsif $storage_set.has_key?(new_command[1])
-          $storage_set.delete(new_command[1])
-          quantity_deleted = 1
+          if check_key_valid?(new_command[1],'set')
+            $storage_set.delete(new_command[1])
+            quantity_deleted = 1
+          end
         end
         render json: {
           code: 0,
@@ -193,7 +239,6 @@ class CommandsController < ApplicationController
         if $storage_string.has_key?(key) or $storage_set.has_key?(key)
           # that key is exist and has default ttl
           
-
           if second <=0 
             $expire_key[key] = -2
             $storage_string.delete(key) if $storage_string.has_key?(key)
@@ -278,5 +323,23 @@ class CommandsController < ApplicationController
 
   def key_expiration_time(time_to_be_expired)
     (time_to_be_expired - Time.now) > 0
+  end
+
+  def check_key_valid?(key, sequence)
+    if sequence == 'string'
+      if $expire_key[key] == nil or key_expiration_time($expire_key[key]) 
+        return true
+      else
+        $storage_string.delete(key) if $storage_string.has_key?(key)
+        return false
+      end
+    else
+      if $expire_key[key] == nil or key_expiration_time($expire_key[key]) 
+        return true
+      else
+        $storage_set.delete(key) if $storage_set.has_key?(key)
+        return false
+      end
+    end
   end
 end
