@@ -45,7 +45,6 @@ class CommandsController < ApplicationController
       else
         key = new_command[1]
         if ($expire_key[key] == nil) or ($expire_key[key] and key_expiration_time($expire_key[key]))
-          puts $storage_string[key]
           render json: {
             code: 0,
             key: key,
@@ -305,6 +304,39 @@ class CommandsController < ApplicationController
         end
         
       end
+    when "SAVE"
+      file = File.open("app/assets/backup/dump.txt", "w") { |f|
+        f.write "$storage_string = #{$storage_string}\n$storage_set = #{$storage_set}\n$expire_key = #{$expire_key}"
+      }
+      
+      render json: {
+        code: 0,
+        message: "OK"
+      }
+      
+    when "RESTORE"
+      file = File.open("app/assets/backup/dump.txt")
+      last_data = file.read.split("\n")
+      # find the index
+      index_string_hash = last_data[0].index('=')+2
+      # assign to string hash
+      $storage_string = JSON.parse(last_data[0][index_string_hash..].gsub("=>",":"))
+
+      # find the index
+      index_set_hash = last_data[1].index('=')+2
+      # assign to string hash
+      $storage_set = JSON.parse(last_data[1][index_set_hash..].gsub("=>",":"))
+
+      # find the index
+      index_expire_hash = last_data[2].index('=')+2
+      # assign to string hash
+      $expire_key = JSON.parse(last_data[2][index_expire_hash..].gsub("=>",":"))
+      file.close
+
+      render json: {
+        code: 0,
+        message: "OK"
+      }
     else
       render json: {
         code: 1,
@@ -344,4 +376,5 @@ class CommandsController < ApplicationController
       end
     end
   end
+
 end
