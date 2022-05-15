@@ -6,7 +6,7 @@ Link to deployment Ledis CLI: https://lediscli.herokuapp.com
 ## Table of contents
 * [Introduction](#Introduction)
 * [Functional Requirements](#functional-requirements)
-* [Setup](#setup)
+* [Set up](#set-up)
 
 # Introduction
 Redis is a popular in-memory data structure store that is widely used in many applications, either as cache, complex data structure, or store application data itself.
