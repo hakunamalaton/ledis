@@ -1,24 +1,19 @@
-# README
+# Ledis
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Stripped down version of Redis named Ledis (for light-weight Redis).
+Link to deployment Ledis CLI: https://lediscli.herokuapp.com
 
-Things you may want to cover:
+## Table of contents
+* [Introduction](#introduction)
+* [Functional Requirements](#functional-requirements)
+* [Setup](#setup)
 
-* Ruby version
+# introduction
+Redis is a popular in-memory data structure store that is widely used in many applications, either as cache, complex data structure, or store application data itself.
 
-* System dependencies
+In this project, I will build a simple stripped down version of Redis named Ledis (for light-weight Redis).
 
-* Configuration
-
-* Database creation
-
-* Database initialization
-
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+Scope of project:
+* Data structures: String, Set
+* Special features: Expire, snapshots
+* A simple web CLI (similar to redis-cli)
