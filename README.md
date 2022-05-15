@@ -49,7 +49,7 @@ Benefits of snapshot in Ledis is to save or back-up data. Some actions will be a
 * SAVE: save current state in a snapshot
 * RESTORE: restore from the last snapshot,
 
-## Error Handling: 
+## Error Handling
 When an error happens, a structural of error statement will be returned: "Error" together with the cause of error if possible. Some errors you can get: 
 
 * Unknown command: when you try to input an unavailable command
