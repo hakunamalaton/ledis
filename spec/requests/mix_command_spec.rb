@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-describe 'Data expiration command API', type: :request do
+describe 'Mixed command', type: :request do
 
   it 'SET key value and expiration time for it' do
     post '/commands', params: { command: "SET mykey 50" }
@@ -221,6 +221,104 @@ describe 'Data expiration command API', type: :request do
       {
         'code' => 0,
         'message' => 0
+      }
+    )
+  end
+
+  it 'SET key value and expiration time for it' do
+    post '/commands', params: { command: "SET mykey 50" }
+    post '/commands', params: { command: "SAVE" }
+    post '/commands', params: { command: "DEL mykey" }
+    post '/commands', params: { command: "RESTORE" }
+    post '/commands', params: { command: "GET mykey" }
+
+    expect(JSON.parse(response.body)).to eq (
+      {
+        'code' => 0,
+        'key' => 'mykey',
+        'value' => "50"
+      }
+    )
+  end
+
+  it 'SET key value and expiration time for it' do
+    post '/commands', params: { command: "SET mykey 50" }
+    post '/commands', params: { command: "EXPIRE mykey 3" }
+    post '/commands', params: { command: "SAVE" }
+    sleep(5)
+    post '/commands', params: { command: "RESTORE" }
+    post '/commands', params: { command: "GET mykey" }
+
+    expect(JSON.parse(response.body)).to eq (
+      {
+        'code' => 0,
+        'key' => 'mykey',
+        'value' => nil
+      }
+    )
+  end
+
+  it 'SET key value and expiration time for it' do
+    post '/commands', params: { command: "SET mykey 50" }
+    post '/commands', params: { command: "EXPIRE mykey 10" }
+    post '/commands', params: { command: "SAVE" }
+    post '/commands', params: { command: "RESTORE" }
+    post '/commands', params: { command: "GET mykey" }
+
+    expect(JSON.parse(response.body)).to eq (
+      {
+        'code' => 0,
+        'key' => 'mykey',
+        'value' => "50"
+      }
+    )
+  end
+
+  it 'SET key value and expiration time for it' do
+    post '/commands', params: { command: "SET mykey 50" }
+    post '/commands', params: { command: "EXPIRE mykey 10" }
+    post '/commands', params: { command: "SAVE" }
+    sleep(5)
+    post '/commands', params: { command: "RESTORE" }
+    post '/commands', params: { command: "GET mykey" }
+
+    expect(JSON.parse(response.body)).to eq (
+      {
+        'code' => 0,
+        'key' => 'mykey',
+        'value' => "50"
+      }
+    )
+  end
+
+  it 'SET key value and expiration time for it' do
+    post '/commands', params: { command: "SET mykey 50" }
+    post '/commands', params: { command: "EXPIRE mykey 10" }
+    post '/commands', params: { command: "SAVE" }
+    sleep(3)
+    post '/commands', params: { command: "RESTORE" }
+    post '/commands', params: { command: "ttl mykey" }
+
+    expect(JSON.parse(response.body)).to eq (
+      {
+        'code' => 0,
+        'value' => 6
+      }
+    )
+  end
+
+  it 'SET key value and expiration time for it' do
+    post '/commands', params: { command: "SET mykey 50" }
+    post '/commands', params: { command: "EXPIRE mykey 2" }
+    post '/commands', params: { command: "SAVE" }
+    sleep(3)
+    post '/commands', params: { command: "RESTORE" }
+    post '/commands', params: { command: "ttl mykey" }
+
+    expect(JSON.parse(response.body)).to eq (
+      {
+        'code' => 0,
+        'value' => -2
       }
     )
   end

@@ -1,159 +1,170 @@
 require 'set'
+require 'time'
 
 class CommandsController < ApplicationController
   protect_from_forgery with: :null_session
-  
-  $storage_string = {}
-  $storage_set = {}
-  $expire_key = {}
+
+  CODE_SUCCESS = 0
+  CODE_WRONG_SYNTAX = 1
+  CODE_WRONG_ARGS = 2
+  CODE_ERROR_SYNTAX = 3
+  CODE_INVALID_TYPE = 4
+  CODE_OUT_OF_RANGE = 5
+
+  OK_MESSAGE = "OK"
+  SYNTAX_ERROR_MESSAGE = "ERROR: syntax error"
+  INVALID_TYPE_MESSAGE = "ERROR: Operation against a key holding the wrong kind of value"
+  OUT_OF_RANGE_MESSAGE = "ERROR: value is not an integer or out of range"
 
   def index
   end
 
   def create
-    new_command = commands_params.squeeze(" ").split(" ")
+    segments = commands_params.squeeze(" ").split(" ")
+    code = CODE_SUCCESS
+    message = OK_MESSAGE
     #  check error before logical code
     
-    case new_command[0].upcase
+    case segments[0].upcase
     when "SET" 
-      if new_command.length < 3 
+      if segments.length < 3 
         render json: {
-          code: 2,
+          code: CODE_WRONG_ARGS,
           message: error_code_2('set')
         }
-      elsif new_command.length > 3
+      elsif segments.length > 3
         render json: {
-          code: 3,
-          message: "ERROR: syntax error"
+          code: CODE_ERROR_SYNTAX,
+          message: SYNTAX_ERROR_MESSAGE
         }
       else
-        $storage_string[new_command[1]] = new_command[2]
-        $storage_set.delete(new_command[1]) if $storage_set.has_key?(new_command[1])
-        $expire_key.delete(new_command[1]) if $expire_key.has_key?(new_command[1])
+        $storage_string[segments[1]] = segments[2]
+        $storage_set.delete(segments[1]) if $storage_set.has_key?(segments[1])
+        $expire_key.delete(segments[1]) if $expire_key.has_key?(segments[1])
         render json: {
-          code: 0,
-          message: "OK"
+          code: CODE_SUCCESS,
+          message: OK_MESSAGE
         }
       end
     when "GET"
       # check if invalid arguments
-      if new_command.length != 2 
+      if segments.length != 2 
         render json: {
-          code: 2,
+          code: CODE_WRONG_ARGS,
           message: error_code_2('get')
         }
       else
-        key = new_command[1]
+        key = segments[1]
         if ($expire_key[key] == nil) or ($expire_key[key] and key_expiration_time($expire_key[key]))
           render json: {
-            code: 0,
+            code: CODE_SUCCESS,
             key: key,
             value: $storage_string[key]
           }
         else
           $storage_string.delete(key) if $storage_string.has_key?(key)
           render json: {
-            code: 0,
+            code: CODE_SUCCESS,
             key: key,
             value: nil
           }
         end
       end
     when "SADD"
-      if new_command.length <= 2
+      if segments.length <= 2
         render json: {
-          code: 2,
+          code: CODE_WRONG_ARGS,
           message: error_code_2('sadd')
         }
       else
-        if $storage_string.has_key?(new_command[1])
-          if check_key_valid?(new_command[1],'string')
+        if $storage_string.has_key?(segments[1])
+          if check_key_valid?(segments[1],'string')
             render json: {
-              code: 4,
-              message: "ERROR: Operation against a key holding the wrong kind of value"
+              code: CODE_INVALID_TYPE,
+              message: INVALID_TYPE_MESSAGE
             }
           end
         end
-        if !$storage_string.has_key?(new_command[1]) or ($storage_string.has_key?(new_command[1]) and !check_key_valid?(new_command[1],'string'))
-          key = new_command[1]
+        if !$storage_string.has_key?(segments[1]) or ($storage_string.has_key?(segments[1]) and !check_key_valid?(segments[1],'string'))
+          key = segments[1]
           $expire_key.delete(key) if $expire_key.has_key?(key)
           new_quantity_value = 0
           if $storage_set[key]
-            new_quantity_value = (new_command[2..].to_set - $storage_set[key]).length()
-            $storage_set[key].add(new_command[2..].to_set)
+            new_quantity_value = (segments[2..].to_set - $storage_set[key]).length()
+            $storage_set[key].add(segments[2..].to_set)
           else
-            new_quantity_value = (new_command[2..].to_set).length()
-            $storage_set[key] = new_command[2..].to_set
+            new_quantity_value = (segments[2..].to_set).length()
+            $storage_set[key] = segments[2..].to_set
           end
           render json: {
-            code: 0,
+            code: CODE_SUCCESS,
             message: new_quantity_value
           }
         end
         # binding.irb
       end
     when "SREM"
-      if new_command.length <= 2
+      if segments.length <= 2
         render json: {
-          code: 2,
+          code: CODE_WRONG_ARGS,
           message: error_code_2('srem')
         }
       else
         quantity_del_value = 0
-        key = new_command[1]
-        if $storage_set[key] and check_key_valid?(key,'set')
-          quantity_del_value = (new_command[2..].to_set & $storage_set[key]).length()
-          $storage_set[key] -= new_command[2..].to_set
+        key = segments[1]
+        if $storage_set[key] && check_key_valid?(key,'set')
+          quantity_del_value = (segments[2..].to_set & $storage_set[key]).length()
+          $storage_set[key] -= segments[2..].to_set
           $storage_set.delete(key) if $storage_set[key].empty?
         end
         render json: {
-          code: 0,
+          code: CODE_SUCCESS,
           message: quantity_del_value
         }
       end
     when "SMEMBERS"
-      if new_command.length == 2
-        key = new_command[1]
+      if segments.length == 2
+        key = segments[1]
         # binding.irb
         if ($expire_key[key] == nil) or (($expire_key[key] != -2) and key_expiration_time($expire_key[key]))
           render json: {
-            code: 0,
+            code: CODE_SUCCESS,
             value: $storage_set[key] ? $storage_set[key] : []
           }
         else
           $storage_set.delete(key) if $storage_set.has_key?(key)
           render json: {
-            code: 0,
+            code: CODE_SUCCESS,
             value: []
           }
         end
       else
         render json: {
-          code: 2,
+          code: CODE_WRONG_ARGS,
           message: error_code_2('smembers')
         }
       end
     when "SINTER"
-      if new_command.length <= 1
+      if segments.length <= 1
         render json: {
-          code: 2,
+          code: CODE_WRONG_ARGS,
           message: error_code_2('sinter')
         }
-      elsif new_command.length == 2
+      elsif segments.length == 2
         # binding.irb
         render json: {
-          code: 0,
-          value: $storage_set[new_command[1]]
+          code: CODE_SUCCESS,
+          value: $storage_set[segments[1]]
         }
       else
         # binding.irb
         value = []
 
-        new_command[1..].each do |key| 
+        segments[1..].each do |key| 
           check_key_valid?(key,'set')
         end
 
-        new_command[1..].each do |key| 
+        segments[1..].each do |key| 
           if $storage_set[key]
             value.push($storage_set[key])
           else
@@ -163,14 +174,14 @@ class CommandsController < ApplicationController
         value = value.inject(:&)
         # binding.irb
         render json: {
-          code: 0,
+          code: CODE_SUCCESS,
           value: value
         }
       end
     when "KEYS"
-      if new_command.length >= 2
+      if segments.length >= 2
         render json: {
-          code: 2,
+          code: CODE_WRONG_ARGS,
           message: error_code_2('keys')
         }
       else
@@ -184,43 +195,43 @@ class CommandsController < ApplicationController
         all_keys += $storage_string.keys 
         all_keys += $storage_set.keys 
         render json: {
-          code: 0,
+          code: CODE_SUCCESS,
           keys: all_keys
         }
       end
     when "DEL"
-      if new_command.length <=1 or new_command.length >= 3
+      if segments.length <=1 or segments.length >= 3
         render json: {
-          code: 2,
+          code: CODE_WRONG_ARGS,
           message: error_code_2('del')
         }
       else
         quantity_deleted = 0
-        if $storage_string.has_key?(new_command[1])
-          if check_key_valid?(new_command[1],'string')
-            $storage_string.delete(new_command[1])
+        if $storage_string.has_key?(segments[1])
+          if check_key_valid?(segments[1],'string')
+            $storage_string.delete(segments[1])
             quantity_deleted = 1
           end
-        elsif $storage_set.has_key?(new_command[1])
-          if check_key_valid?(new_command[1],'set')
-            $storage_set.delete(new_command[1])
+        elsif $storage_set.has_key?(segments[1])
+          if check_key_valid?(segments[1],'set')
+            $storage_set.delete(segments[1])
             quantity_deleted = 1
           end
         end
         render json: {
-          code: 0,
+          code: CODE_SUCCESS,
           message: quantity_deleted
         }
       end
     when "EXPIRE"
-      if new_command.length > 3 or new_command.length <= 2
+      if segments.length > 3 or segments.length <= 2
         render json: {
-          code: 2,
+          code: CODE_WRONG_ARGS,
           message: error_code_2('expire')
         }
       else
-        key = new_command[1]
-        second = new_command[2]
+        key = segments[1]
+        second = segments[2]
         side = 1
         if second[0] == '-'
           side = -1
@@ -229,8 +240,8 @@ class CommandsController < ApplicationController
         
         if second.match?(/[^0-9]/)
           render json: {
-            code: 5,
-            message: "ERROR: value is not an integer or out of range"
+            code: CODE_OUT_OF_RANGE,
+            message: OUT_OF_RANGE_MESSAGE
           }
           return
         else
@@ -250,97 +261,130 @@ class CommandsController < ApplicationController
               $expire_key[key] = Time.now + second
             else
               render json: {
-                code: 0,
+                code: CODE_SUCCESS,
                 value: 0
               }
               return
             end
           end
           render json: {
-            code: 0,
+            code: CODE_SUCCESS,
             value: 1
           }
         else
           render json: {
-            code: 0,
+            code: CODE_SUCCESS,
             value: 0
           }
         end
       end
     when "TTL"
-      if new_command.length != 2
+      if segments.length != 2
         render json: {
-          code: 2,
+          code: CODE_WRONG_ARGS,
           message: error_code_2('ttl')
         }
       else
-        key = new_command[1]
+        key = segments[1]
         if !$storage_set.has_key?(key) and !$storage_string.has_key?(key) 
           render json: {
-            code: 0,
+            code: CODE_SUCCESS,
             value: -2
           }
         elsif $expire_key[key]
           time_remain = ($expire_key[key] - Time.now)
           if key_expiration_time($expire_key[key])
             render json: {
-              code: 0,
-              value: time_remain.to_i
+              code: CODE_SUCCESS,
+              value: time_remain.to_i > 0 ? time_remain.to_i : -2
             }
           else
             $expire_key[key] = -2
             $storage_string.delete(key) if $storage_string.has_key?(key)
             $storage_set.delete(key) if $storage_set.has_key?(key)
             render json: {
-              code: 0,
+              code: CODE_SUCCESS,
               value: -2
             }
           end
         else
           render json: {
-            code: 0,
+            code: CODE_SUCCESS,
             value: -1
           }
         end
         
       end
     when "SAVE"
-      file = File.open("app/assets/backup/dump.txt", "w") { |f|
-        f.write "$storage_string = #{$storage_string}\n$storage_set = #{$storage_set}\n$expire_key = #{$expire_key}"
-      }
+      # code = CODE_SUCCESS
+      # message = OK_MESSAGE
+      if segments.length > 1
+        code = 2
+        message = error_code_2('save')
+      end
+      if code == 0
+        expire_key_saving = {}
+        $expire_key.each { |key, expire|
+          expire_key_saving[key] = expire.to_s
+        }
+        file = File.open("app/assets/backup/dump.txt", "w") { |f|
+          f.write "$storage_string = #{$storage_string}\n$storage_set = #{$storage_set}\n$expire_key = #{expire_key_saving}"
+        }
+      end
       
       render json: {
-        code: 0,
-        message: "OK"
+        code: code,
+        message: message
       }
       
     when "RESTORE"
-      file = File.open("app/assets/backup/dump.txt")
-      last_data = file.read.split("\n")
-      # find the index
-      index_string_hash = last_data[0].index('=')+2
-      # assign to string hash
-      $storage_string = JSON.parse(last_data[0][index_string_hash..].gsub("=>",":"))
+      # code = CODE_SUCCESS
+      # message = OK_MESSAGE
+      if segments.length > 1
+        code = 2
+        message = error_code_2('restore')
+      end
+      if code == 0
+        file = File.open("app/assets/backup/dump.txt")
+        last_data = file.read.split("\n")
+        # find the index
+        # index_string_hash = last_data[0].index('=')+2
+        # # assign to string hash
+        # $storage_string = JSON.parse(last_data[0][index_string_hash..].gsub("=>",":"))
 
-      # find the index
-      index_set_hash = last_data[1].index('=')+2
-      # assign to string hash
-      $storage_set = JSON.parse(last_data[1][index_set_hash..].gsub("=>",":"))
+        # # find the index
+        # index_set_hash = last_data[1].index('=')+2
+        # # assign to string hash
+        # $storage_set = JSON.parse(last_data[1][index_set_hash..].gsub("=>",":"))
 
-      # find the index
-      index_expire_hash = last_data[2].index('=')+2
-      # assign to string hash
-      $expire_key = JSON.parse(last_data[2][index_expire_hash..].gsub("=>",":"))
-      file.close
+        # # find the index
+        # index_expire_hash = last_data[2].index('=')+2
+        # # assign to string hash
+        # $expire_key = JSON.parse(last_data[2][index_expire_hash..].gsub("=>",":"))
+
+        # not secure
+        eval(last_data[0])
+        eval(last_data[1])
+        eval(last_data[2])
+
+        # puts $expire_key
+        unless $expire_key.empty? 
+          $expire_key.each do |key, expire_string|
+            $expire_key[key] = Time.parse(expire_string)
+          end
+        end
+        # puts $expire_key 
+        file.close
+      end
 
       render json: {
-        code: 0,
-        message: "OK"
+        code: code,
+        message: message
       }
     else
       render json: {
-        code: 1,
-        message: "Error: unknown command '#{new_command[0]}'"
+        code: CODE_WRONG_SYNTAX,
+        message: "Error: unknown command '#{segments[0]}'"
       }
     end
 

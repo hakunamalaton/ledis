@@ -20,3 +20,9 @@ module RedisClone
     # config.eager_load_paths << Rails.root.join("extras")
   end
 end
+
+# Global variable for ledis commands
+# check commands_controller.rb for its usage
+$storage_string ||= {}
+$storage_set ||= {}
+$expire_key ||= {}
