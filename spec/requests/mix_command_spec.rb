@@ -37,7 +37,6 @@ describe 'Mixed command', type: :request do
     sleep(3)
     post '/commands', params: { command: "SMEMBERS mykey" }
 
-
     expect(JSON.parse(response.body)).to eq (
       {
         'code' => 0,
@@ -52,7 +51,6 @@ describe 'Mixed command', type: :request do
     post '/commands', params: { command: "EXPIRE mykey 5" }
     sleep(6)
     post '/commands', params: { command: "SMEMBERS mykey" }
-
 
     expect(JSON.parse(response.body)).to eq (
       {
@@ -69,7 +67,6 @@ describe 'Mixed command', type: :request do
     sleep(6)
     post '/commands', params: { command: "KEYS" }
 
-
     expect(JSON.parse(response.body)).to eq (
       {
         'code' => 0,
@@ -84,7 +81,6 @@ describe 'Mixed command', type: :request do
     post '/commands', params: { command: "EXPIRE myanotherkey 5" }
     sleep(3)
     post '/commands', params: { command: "SINTER mykey myanotherkey" }
-
 
     expect(JSON.parse(response.body)).to eq (
       {
@@ -101,7 +97,6 @@ describe 'Mixed command', type: :request do
     sleep(5)
     post '/commands', params: { command: "SINTER mykey myanotherkey" }
 
-
     expect(JSON.parse(response.body)).to eq (
       {
         'code' => 0,
@@ -116,7 +111,6 @@ describe 'Mixed command', type: :request do
     post '/commands', params: { command: "EXPIRE myanotherkey 5" }
     sleep(5)
     post '/commands', params: { command: "SINTER mykey myanotherkey" }
-
 
     expect(JSON.parse(response.body)).to eq (
       {

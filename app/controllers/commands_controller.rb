@@ -52,7 +52,7 @@ class CommandsController < ApplicationController
         # key = nil
       else
         key = segments[1]
-        if ($expire_key[key] == nil) or ($expire_key[key] and key_expiration_time($expire_key[key]))
+        if ($expire_key[key] == nil) || ($expire_key[key] && key_expiration_time($expire_key[key]))
           code = CODE_SUCCESS
           value = $storage_string[key]
         else
@@ -85,7 +85,7 @@ class CommandsController < ApplicationController
             message = INVALID_TYPE_MESSAGE
           end
         end
-        if !$storage_string.has_key?(segments[1]) or ($storage_string.has_key?(segments[1]) and !check_key_valid?(segments[1],'string'))
+        if !$storage_string.has_key?(segments[1]) || ($storage_string.has_key?(segments[1]) && !check_key_valid?(segments[1],'string'))
           key = segments[1]
           $expire_key.delete(key) if $expire_key.has_key?(key)
           new_quantity_value = 0
@@ -126,7 +126,7 @@ class CommandsController < ApplicationController
       value = nil
       if segments.length == 2
         key = segments[1]
-        if ($expire_key[key] == nil) or (($expire_key[key] != -2) and key_expiration_time($expire_key[key]))
+        if ($expire_key[key] == nil) || (($expire_key[key] != -2) && key_expiration_time($expire_key[key]))
           code = CODE_SUCCESS
           value = $storage_set[key] ? $storage_set[key] : []
         else
@@ -181,11 +181,10 @@ class CommandsController < ApplicationController
       end
       render json: sinter_response
     when "KEYS"
+      keys = nil
       if segments.length >= 2
-        render json: {
-          code: CODE_WRONG_ARGS,
-          message: error_code_2('keys')
-        }
+        code = CODE_WRONG_ARGS
+        message = error_code_2('keys')
       else
         all_keys = []
         $storage_string.keys.each do |key|
@@ -196,17 +195,21 @@ class CommandsController < ApplicationController
         end
         all_keys += $storage_string.keys 
         all_keys += $storage_set.keys 
-        render json: {
-          code: CODE_SUCCESS,
-          keys: all_keys
-        }
+        keys = all_keys
       end
+      keys_response = {
+        code: code
+      }
+      if code != 0
+        keys_response["message".to_sym] = message
+      else
+        keys_response["keys".to_sym] = keys
+      end
+      render json: keys_response
     when "DEL"
-      if segments.length <=1 or segments.length >= 3
-        render json: {
-          code: CODE_WRONG_ARGS,
-          message: error_code_2('del')
-        }
+      if segments.length <=1 || segments.length >= 3
+        code = CODE_WRONG_ARGS
+        message = error_code_2('del')
       else
         quantity_deleted = 0
         if $storage_string.has_key?(segments[1])
@@ -220,17 +223,18 @@ class CommandsController < ApplicationController
             quantity_deleted = 1
           end
         end
-        render json: {
-          code: CODE_SUCCESS,
-          message: quantity_deleted
-        }
+        message = quantity_deleted
       end
+      render json: {
+        code: code,
+        message: message
+      }
     when "EXPIRE"
-      if segments.length > 3 or segments.length <= 2
-        render json: {
-          code: CODE_WRONG_ARGS,
-          message: error_code_2('expire')
-        }
+      
+      value = nil
+      if segments.length > 3 || segments.length <= 2
+        code = CODE_WRONG_ARGS
+        message = error_code_2('expire')
       else
         key = segments[1]
         second = segments[2]
@@ -241,84 +245,72 @@ class CommandsController < ApplicationController
         end
         
         if second.match?(/[^0-9]/)
-          render json: {
-            code: CODE_OUT_OF_RANGE,
-            message: OUT_OF_RANGE_MESSAGE
-          }
-          return
+          code = CODE_OUT_OF_RANGE
+          message = OUT_OF_RANGE_MESSAGE
         else
           second = second.to_i * side
         end
 
-        if $storage_string.has_key?(key) or $storage_set.has_key?(key)
-          # that key is exist and has default ttl
-          
+        if $storage_string.has_key?(key) || $storage_set.has_key?(key)
+          # that key is exist && has default ttl
           if second <= 0 
             $expire_key[key] = -2
             $storage_string.delete(key) if $storage_string.has_key?(key)
             $storage_set.delete(key) if $storage_set.has_key?(key)
           else
-            if ($expire_key[key] == nil) or ($expire_key[key] != -2 and Time.now - $expire_key[key] <= 0) 
+            if ($expire_key[key] == nil) || ($expire_key[key] != -2 && Time.now - $expire_key[key] <= 0) 
               $expire_key[key] = Time.now + second
             else
-              render json: {
-                code: CODE_SUCCESS,
-                value: 0
-              }
-              return
+              value = 0
             end
           end
-          render json: {
-            code: CODE_SUCCESS,
-            value: 1
-          }
+          value = 1 if value != 0
         else
-          render json: {
-            code: CODE_SUCCESS,
-            value: 0
-          }
+          value = 0
         end
       end
+      expire_response = {
+        code: code
+      }
+      if code != 0
+        expire_response["message".to_sym] = message
+      else
+        expire_response["value".to_sym] = value
+      end
+      render json: expire_response
     when "TTL"
+      value = nil
       if segments.length != 2
-        render json: {
-          code: CODE_WRONG_ARGS,
-          message: error_code_2('ttl')
-        }
+        code = CODE_WRONG_ARGS
+        message = error_code_2('ttl')
       else
         key = segments[1]
-        if !$storage_set.has_key?(key) and !$storage_string.has_key?(key) 
-          render json: {
-            code: CODE_SUCCESS,
-            value: -2
-          }
+        if !$storage_set.has_key?(key) && !$storage_string.has_key?(key) 
+          value = -2
         elsif $expire_key[key]
           time_remain = ($expire_key[key] - Time.now)
           if key_expiration_time($expire_key[key])
-            render json: {
-              code: CODE_SUCCESS,
-              value: time_remain.to_i > 0 ? time_remain.to_i : -2
-            }
+            value = time_remain.to_i > 0 ? time_remain.to_i : -2
           else
             $expire_key[key] = -2
             $storage_string.delete(key) if $storage_string.has_key?(key)
             $storage_set.delete(key) if $storage_set.has_key?(key)
-            render json: {
-              code: CODE_SUCCESS,
-              value: -2
-            }
+            value = -2
           end
         else
-          render json: {
-            code: CODE_SUCCESS,
-            value: -1
-          }
+          value = -1
         end
-        
       end
+      ttl_response = {
+        code: code
+      }
+      if code != 0
+        ttl_response["message".to_sym] = message
+      else
+        ttl_response["value".to_sym] = value
+      end
+      render json: ttl_response
     when "SAVE"
-      # code = CODE_SUCCESS
-      # message = OK_MESSAGE
       if segments.length > 1
         code = 2
         message = error_code_2('save')
@@ -339,8 +331,6 @@ class CommandsController < ApplicationController
       }
       
     when "RESTORE"
-      # code = CODE_SUCCESS
-      # message = OK_MESSAGE
       if segments.length > 1
         code = 2
         message = error_code_2('restore')
@@ -382,7 +372,7 @@ class CommandsController < ApplicationController
         code: code,
         message: message
       }
-    else
+    else # unknown command or undefined command
       render json: {
         code: CODE_WRONG_SYNTAX,
         message: "Error: unknown command '#{segments[0]}'"
@@ -406,14 +396,14 @@ class CommandsController < ApplicationController
 
   def check_key_valid?(key, sequence)
     if sequence == 'string'
-      if $expire_key[key] == nil or key_expiration_time($expire_key[key]) 
+      if $expire_key[key] == nil || key_expiration_time($expire_key[key]) 
         return true
       else
         $storage_string.delete(key) if $storage_string.has_key?(key)
         return false
       end
     else
-      if $expire_key[key] == nil or key_expiration_time($expire_key[key]) 
+      if $expire_key[key] == nil || key_expiration_time($expire_key[key]) 
         return true
       else
         $storage_set.delete(key) if $storage_set.has_key?(key)

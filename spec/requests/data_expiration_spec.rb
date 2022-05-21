@@ -145,10 +145,10 @@ describe 'Data expiration command API', type: :request do
       end
       
       it 'reEXPIRE time for a timeout key' do
-        post '/commands', params: { command: "SET key1 something"}
-        post '/commands', params: { command: "EXPIRE key1 10"}
+        post '/commands', params: { command: "SET key4 something"}
+        post '/commands', params: { command: "EXPIRE key4 10"}
         sleep(15)
-        post '/commands', params: { command: "EXPIRE key1 50"}
+        post '/commands', params: { command: "EXPIRE key4 50"}
 
         expect(JSON.parse(response.body)).to eq (
           {
