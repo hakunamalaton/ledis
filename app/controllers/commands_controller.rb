@@ -28,27 +28,15 @@ class CommandsController < ApplicationController
     case segments[0].upcase
     when "SET" 
       if segments.length < 3 
-        # render json: {
-        #   code: CODE_WRONG_ARGS,
-        #   message: error_code_2('set')
-        # }
         code = CODE_WRONG_ARGS
         message = error_code_2('set')
       elsif segments.length > 3
-        # render json: {
-        #   code: CODE_ERROR_SYNTAX,
-        #   message: SYNTAX_ERROR_MESSAGE
-        # }
         code = CODE_ERROR_SYNTAX
         message = SYNTAX_ERROR_MESSAGE
       else
         $storage_string[segments[1]] = segments[2]
         $storage_set.delete(segments[1]) if $storage_set.has_key?(segments[1])
         $expire_key.delete(segments[1]) if $expire_key.has_key?(segments[1])
-        # render json: {
-        #   code: CODE_SUCCESS,
-        #   message: OK_MESSAGE
-        # }
       end
       render json: {
         code: code,
@@ -59,30 +47,17 @@ class CommandsController < ApplicationController
       value = nil
       # check if invalid arguments
       if segments.length != 2 
-        # render json: {
-        #   code: CODE_WRONG_ARGS,
-        #   message: error_code_2('get')
-        # }
         code = CODE_WRONG_ARGS
         message = error_code_2('get')
         # key = nil
       else
         key = segments[1]
         if ($expire_key[key] == nil) or ($expire_key[key] and key_expiration_time($expire_key[key]))
-          # render json: {
-          #   code: CODE_SUCCESS,
-          #   key: key,
-          #   value: $storage_string[key]
-          # }
           code = CODE_SUCCESS
           value = $storage_string[key]
         else
           $storage_string.delete(key) if $storage_string.has_key?(key)
-          # render json: {
-          #   code: CODE_SUCCESS,
-          #   key: key,
-          #   value: nil
-          # }
+
           code = CODE_SUCCESS
           key = key
           value = nil
@@ -93,7 +68,6 @@ class CommandsController < ApplicationController
       }
 
       if code != 0
-        # error case
         get_response["message".to_sym] = message 
       else
         get_response["key".to_sym] = key
@@ -102,17 +76,13 @@ class CommandsController < ApplicationController
       render json: get_response
     when "SADD"
       if segments.length <= 2
-        render json: {
-          code: CODE_WRONG_ARGS,
-          message: error_code_2('sadd')
-        }
+        code = CODE_WRONG_ARGS
+        message = error_code_2('sadd')
       else
         if $storage_string.has_key?(segments[1])
           if check_key_valid?(segments[1],'string')
-            render json: {
-              code: CODE_INVALID_TYPE,
-              message: INVALID_TYPE_MESSAGE
-            }
+            code = CODE_INVALID_TYPE
+            message = INVALID_TYPE_MESSAGE
           end
         end
         if !$storage_string.has_key?(segments[1]) or ($storage_string.has_key?(segments[1]) and !check_key_valid?(segments[1],'string'))
@@ -126,18 +96,18 @@ class CommandsController < ApplicationController
             new_quantity_value = (segments[2..].to_set).length()
             $storage_set[key] = segments[2..].to_set
           end
-          render json: {
-            code: CODE_SUCCESS,
-            message: new_quantity_value
-          }
+          code = CODE_SUCCESS
+          message = new_quantity_value
         end
       end
+      render json: {
+        code: code,
+        message: message
+      }
     when "SREM"
       if segments.length <= 2
-        render json: {
-          code: CODE_WRONG_ARGS,
-          message: error_code_2('srem')
-        }
+        code = CODE_WRONG_ARGS
+        message = error_code_2('srem')
       else
         quantity_del_value = 0
         key = segments[1]
@@ -146,46 +116,47 @@ class CommandsController < ApplicationController
           $storage_set[key] -= segments[2..].to_set
           $storage_set.delete(key) if $storage_set[key].empty?
         end
-        render json: {
-          code: CODE_SUCCESS,
-          message: quantity_del_value
-        }
+        message = quantity_del_value
       end
+      render json: {
+        code: code,
+        message: message
+      }
     when "SMEMBERS"
+      value = nil
       if segments.length == 2
         key = segments[1]
         if ($expire_key[key] == nil) or (($expire_key[key] != -2) and key_expiration_time($expire_key[key]))
-          render json: {
-            code: CODE_SUCCESS,
-            value: $storage_set[key] ? $storage_set[key] : []
-          }
+          code = CODE_SUCCESS
+          value = $storage_set[key] ? $storage_set[key] : []
         else
           $storage_set.delete(key) if $storage_set.has_key?(key)
-          render json: {
-            code: CODE_SUCCESS,
-            value: []
-          }
+          code = CODE_SUCCESS
+          value = []
         end
       else
-        render json: {
-          code: CODE_WRONG_ARGS,
-          message: error_code_2('smembers')
-        }
+        code = CODE_WRONG_ARGS
+        message = error_code_2('smembers')
       end
+      smembers_response = {
+        code: code
+      }
+      if code != 0
+        # error case
+        smembers_response["message".to_sym] = message
+      else
+        smembers_response["value".to_sym] = value
+      end
+      render json: smembers_response
     when "SINTER"
+      value = nil
       if segments.length <= 1
-        render json: {
-          code: CODE_WRONG_ARGS,
-          message: error_code_2('sinter')
-        }
+        code = CODE_WRONG_ARGS
+        message = error_code_2('sinter')
       elsif segments.length == 2
-        render json: {
-          code: CODE_SUCCESS,
-          value: $storage_set[segments[1]]
-        }
+        value = $storage_set[segments[1]]
       else
         value = []
-
         segments[1..].each do |key| 
           check_key_valid?(key,'set')
         end
@@ -198,11 +169,17 @@ class CommandsController < ApplicationController
           end
         end
         value = value.inject(:&)
-        render json: {
-          code: CODE_SUCCESS,
-          value: value
-        }
       end
+      sinter_response = {
+        code: code
+      }
+      if code != 0
+        # error case
+        sinter_response["message".to_sym] = message
+      else
+        sinter_response["value".to_sym] = value
+      end
+      render json: sinter_response
     when "KEYS"
       if segments.length >= 2
         render json: {

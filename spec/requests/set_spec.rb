@@ -162,7 +162,7 @@ describe 'Set command API', type: :request do
         expect(JSON.parse(response.body)).to eq (
           {
             'code' => 0,
-            'value' => nil
+            'value' => []
           }
         )
       end
