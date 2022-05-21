@@ -28,48 +28,78 @@ class CommandsController < ApplicationController
     case segments[0].upcase
     when "SET" 
       if segments.length < 3 
-        render json: {
-          code: CODE_WRONG_ARGS,
-          message: error_code_2('set')
-        }
+        # render json: {
+        #   code: CODE_WRONG_ARGS,
+        #   message: error_code_2('set')
+        # }
+        code = CODE_WRONG_ARGS
+        message = error_code_2('set')
       elsif segments.length > 3
-        render json: {
-          code: CODE_ERROR_SYNTAX,
-          message: SYNTAX_ERROR_MESSAGE
-        }
+        # render json: {
+        #   code: CODE_ERROR_SYNTAX,
+        #   message: SYNTAX_ERROR_MESSAGE
+        # }
+        code = CODE_ERROR_SYNTAX
+        message = SYNTAX_ERROR_MESSAGE
       else
         $storage_string[segments[1]] = segments[2]
         $storage_set.delete(segments[1]) if $storage_set.has_key?(segments[1])
         $expire_key.delete(segments[1]) if $expire_key.has_key?(segments[1])
-        render json: {
-          code: CODE_SUCCESS,
-          message: OK_MESSAGE
-        }
+        # render json: {
+        #   code: CODE_SUCCESS,
+        #   message: OK_MESSAGE
+        # }
       end
+      render json: {
+        code: code,
+        message: message
+      }
     when "GET"
+      key = nil
+      value = nil
       # check if invalid arguments
       if segments.length != 2 
-        render json: {
-          code: CODE_WRONG_ARGS,
-          message: error_code_2('get')
-        }
+        # render json: {
+        #   code: CODE_WRONG_ARGS,
+        #   message: error_code_2('get')
+        # }
+        code = CODE_WRONG_ARGS
+        message = error_code_2('get')
+        # key = nil
       else
         key = segments[1]
         if ($expire_key[key] == nil) or ($expire_key[key] and key_expiration_time($expire_key[key]))
-          render json: {
-            code: CODE_SUCCESS,
-            key: key,
-            value: $storage_string[key]
-          }
+          # render json: {
+          #   code: CODE_SUCCESS,
+          #   key: key,
+          #   value: $storage_string[key]
+          # }
+          code = CODE_SUCCESS
+          value = $storage_string[key]
         else
           $storage_string.delete(key) if $storage_string.has_key?(key)
-          render json: {
-            code: CODE_SUCCESS,
-            key: key,
-            value: nil
-          }
+          # render json: {
+          #   code: CODE_SUCCESS,
+          #   key: key,
+          #   value: nil
+          # }
+          code = CODE_SUCCESS
+          key = key
+          value = nil
         end
       end
+      get_response = {
+        code: code
+      }
+
+      if code != 0
+        # error case
+        get_response["message".to_sym] = message 
+      else
+        get_response["key".to_sym] = key
+        get_response["value".to_sym] = value          
+      end
+      render json: get_response
     when "SADD"
       if segments.length <= 2
         render json: {
@@ -101,7 +131,6 @@ class CommandsController < ApplicationController
             message: new_quantity_value
           }
         end
-        # binding.irb
       end
     when "SREM"
       if segments.length <= 2
@@ -125,7 +154,6 @@ class CommandsController < ApplicationController
     when "SMEMBERS"
       if segments.length == 2
         key = segments[1]
-        # binding.irb
         if ($expire_key[key] == nil) or (($expire_key[key] != -2) and key_expiration_time($expire_key[key]))
           render json: {
             code: CODE_SUCCESS,
@@ -151,13 +179,11 @@ class CommandsController < ApplicationController
           message: error_code_2('sinter')
         }
       elsif segments.length == 2
-        # binding.irb
         render json: {
           code: CODE_SUCCESS,
           value: $storage_set[segments[1]]
         }
       else
-        # binding.irb
         value = []
 
         segments[1..].each do |key| 
@@ -172,7 +198,6 @@ class CommandsController < ApplicationController
           end
         end
         value = value.inject(:&)
-        # binding.irb
         render json: {
           code: CODE_SUCCESS,
           value: value
@@ -256,7 +281,6 @@ class CommandsController < ApplicationController
             $storage_string.delete(key) if $storage_string.has_key?(key)
             $storage_set.delete(key) if $storage_set.has_key?(key)
           else
-            # binding.irb
             if ($expire_key[key] == nil) or ($expire_key[key] != -2 and Time.now - $expire_key[key] <= 0) 
               $expire_key[key] = Time.now + second
             else
