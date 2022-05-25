@@ -156,6 +156,19 @@ describe 'Set command API', type: :request do
         )
       end
 
+      it 'access to exist key that add duplicate value twice' do 
+        post '/commands', params: { command: "SADD tlt 123 456" }
+        post '/commands', params: { command: "SADD tlt 123 456" }
+        post '/commands', params: { command: "SMEMBERS tlt" }
+
+        expect(JSON.parse(response.body)).to eq (
+          {
+            'code' => 0,
+            'value' => ['123', '456']
+          }
+        )
+      end
+
       it 'access to unexist key set' do
         post '/commands', params: { command: "SMEMBERS yut" }
 

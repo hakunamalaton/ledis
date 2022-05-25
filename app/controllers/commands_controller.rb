@@ -57,7 +57,6 @@ class CommandsController < ApplicationController
           value = $storage_string[key]
         else
           $storage_string.delete(key) if $storage_string.has_key?(key)
-
           code = CODE_SUCCESS
           key = key
           value = nil
@@ -91,7 +90,7 @@ class CommandsController < ApplicationController
           new_quantity_value = 0
           if $storage_set[key]
             new_quantity_value = (segments[2..].to_set - $storage_set[key]).length()
-            $storage_set[key].add(segments[2..].to_set)
+            $storage_set[key].merge(segments[2..].to_set)
           else
             new_quantity_value = (segments[2..].to_set).length()
             $storage_set[key] = segments[2..].to_set
@@ -320,8 +319,12 @@ class CommandsController < ApplicationController
         $expire_key.each { |key, expire|
           expire_key_saving[key] = expire.to_s
         }
+        storage_set_to_array = {}
+        $storage_set.each { |key, set|
+          storage_set_to_array[key] = set.to_a
+        }
         file = File.open("app/assets/backup/dump.txt", "w") { |f|
-          f.write "$storage_string = #{$storage_string}\n$storage_set = #{$storage_set}\n$expire_key = #{expire_key_saving}"
+          f.write "$storage_string = #{$storage_string}\n$storage_set = #{storage_set_to_array}\n$expire_key = #{expire_key_saving}"
         }
       end
       
@@ -361,10 +364,16 @@ class CommandsController < ApplicationController
         # puts $expire_key
         unless $expire_key.empty? 
           $expire_key.each do |key, expire_string|
-            $expire_key[key] = Time.parse(expire_string)
+            $expire_key[key] = Time.parse(expire_string) unless expire_string == "-2"
           end
         end
-        # puts $expire_key 
+        # change format of $storage_set 
+        unless $storage_set.empty? 
+          $storage_set.each do |key, set_array|
+            $storage_set[key] = set_array.to_set
+          end
+        end
+
         file.close
       end
 
@@ -391,6 +400,7 @@ class CommandsController < ApplicationController
   end
 
   def key_expiration_time(time_to_be_expired)
+    return false if time_to_be_expired == -2
     (time_to_be_expired - Time.now) > 0
   end
 
